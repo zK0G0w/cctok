@@ -20,6 +20,9 @@ var (
 var rangeCmd = &cobra.Command{
 	Use:   "range",
 	Short: "查看指定日期范围的 token 用量",
+	Long:  "展示指定日期范围内的 token 消耗和费用，按项目分组汇总。",
+	Example: `  cctok range --from 2026-06-01 --to 2026-06-05
+  cctok range --from 2026-05-01 --to 2026-05-31`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		from, err := time.ParseInLocation("2006-01-02", rangeFrom, time.Now().Location())
 		if err != nil {

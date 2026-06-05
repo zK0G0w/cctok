@@ -15,6 +15,7 @@ import (
 var weeklyCmd = &cobra.Command{
 	Use:   "weekly",
 	Short: "查看本周 token 用量（按项目）",
+	Long:  "展示本周（周一至今天）所有 Claude Code 会话的 token 消耗和费用，按项目分组汇总。",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
 		records, err := parser.ParseAll(cfg.ClaudeDir)

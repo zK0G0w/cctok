@@ -63,7 +63,7 @@ func DiscoverFiles(claudeDir string) ([]string, error) {
 }
 
 // ParseFile 解析单个 JSONL 文件，返回 assistant 类型的 Record 列表
-func ParseFile(path string) ([]Record, error) {
+func ParseFile(path string, projectName string) ([]Record, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func ParseFile(path string) ([]Record, error) {
 			Usage:     raw.Message.Usage,
 			Timestamp: ts,
 			SessionID: raw.SessionID,
-			Project:   ExtractProjectName(raw.Cwd),
+			Project:   projectName,
 		})
 	}
 
@@ -114,19 +114,103 @@ func ParseAll(claudeDir string) ([]Record, error) {
 		return nil, err
 	}
 
+	projectsDir := filepath.Join(claudeDir, "projects")
+	// 第一遍：按项目目录分组，从每组第一条记录的 cwd 提取项目名
+	projectNameCache := make(map[string]string)
+
 	var all []Record
 	for _, f := range files {
-		records, err := ParseFile(f)
+		dirName := extractProjectDir(f, projectsDir)
+		projectName, cached := projectNameCache[dirName]
+		if !cached {
+			projectName = "" // 先留空，解析时从第一条 cwd 提取
+		}
+
+		records, firstCwd, err := parseFileWithCwd(f)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: 跳过文件 %s: %v\n", f, err)
 			continue
+		}
+
+		if !cached && firstCwd != "" {
+			projectName = ExtractProjectName(firstCwd)
+			projectNameCache[dirName] = projectName
+		} else if !cached {
+			projectName = dirName
+			projectNameCache[dirName] = projectName
+		}
+
+		for i := range records {
+			records[i].Project = projectName
 		}
 		all = append(all, records...)
 	}
 	return all, nil
 }
 
-// ExtractProjectName 从 cwd 路径中提取最后两段作为项目名
+// extractProjectDir 从文件路径中提取项目目录名
+func extractProjectDir(filePath, projectsDir string) string {
+	rel, err := filepath.Rel(projectsDir, filePath)
+	if err != nil {
+		return "unknown"
+	}
+	parts := strings.SplitN(rel, string(filepath.Separator), 2)
+	if len(parts) == 0 {
+		return "unknown"
+	}
+	return parts[0]
+}
+
+// parseFileWithCwd 解析 JSONL 文件，返回记录列表和第一条记录的 cwd
+func parseFileWithCwd(path string) ([]Record, string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, "", err
+	}
+	defer f.Close()
+
+	var records []Record
+	var firstCwd string
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		var raw rawRecord
+		if err := json.Unmarshal(line, &raw); err != nil {
+			continue
+		}
+
+		if raw.Type != "assistant" || raw.Message.ID == "" {
+			continue
+		}
+
+		if firstCwd == "" && raw.Cwd != "" {
+			firstCwd = raw.Cwd
+		}
+
+		ts, err := time.Parse(time.RFC3339Nano, raw.Timestamp)
+		if err != nil {
+			ts = time.Time{}
+		}
+
+		records = append(records, Record{
+			MessageID: raw.Message.ID,
+			Model:     raw.Message.Model,
+			Usage:     raw.Message.Usage,
+			Timestamp: ts,
+			SessionID: raw.SessionID,
+		})
+	}
+
+	return records, firstCwd, nil
+}
+
+// ExtractProjectName 从 cwd 路径中提取最后两段作为项目名（保留兼容）
 func ExtractProjectName(cwd string) string {
 	if cwd == "" {
 		return "unknown"

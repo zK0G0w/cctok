@@ -15,6 +15,7 @@ import (
 var modelsCmd = &cobra.Command{
 	Use:   "models",
 	Short: "查看今日 token 用量（按模型）",
+	Long:  "展示今天所有 Claude Code 会话的 token 消耗和费用，按模型分组汇总。",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
 		records, err := parser.ParseAll(cfg.ClaudeDir)

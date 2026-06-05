@@ -17,6 +17,9 @@ var sessionsProject string
 var sessionsCmd = &cobra.Command{
 	Use:   "sessions",
 	Short: "查看会话级详细用量",
+	Long:  "展示今天每个会话的详细 token 用量，支持按项目名模糊过滤。",
+	Example: `  cctok sessions
+  cctok sessions --project branch_payment`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
 		records, err := parser.ParseAll(cfg.ClaudeDir)
