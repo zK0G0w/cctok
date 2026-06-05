@@ -18,5 +18,13 @@ archives:
       - goos: windows
         format: zip
 
+brews:
+  - repository:
+      owner: zK0G0w
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/zK0G0w/cctok"
+    description: "CLI tool for tracking Claude Code & Codex token usage and costs"
+
 changelog:
   sort: asc
