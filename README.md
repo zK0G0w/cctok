@@ -164,3 +164,7 @@ cache_read = 0.50
 ## License
 
 MIT
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=zK0G0w/cctok&type=Date)](https://star-history.com/#zK0G0w/cctok&Date)
