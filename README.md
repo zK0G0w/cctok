@@ -1,8 +1,13 @@
 # cctok
 
-Claude Code 本地 token 用量统计与费用计算 CLI 工具。
+Claude Code & Codex 本地 token 用量统计与费用计算 CLI 工具。
 
-读取 `~/.claude/projects/` 下的 JSONL 会话文件，按项目、模型、时间等维度统计 token 消耗并估算费用。无需联网，纯本地离线分析。
+读取本地 JSONL 会话文件，按项目、模型、时间等维度统计 token 消耗并估算费用。支持 Claude Code 和 OpenAI Codex 双工具，按来源分区展示。无需联网，纯本地离线分析。
+
+## 数据来源
+
+- **Claude Code**: `~/.claude/projects/`（含子代理）
+- **Codex**: `~/.codex/sessions/`
 
 ## 安装
 
@@ -42,15 +47,27 @@ cctok sessions --project branch_payment
 ## 输出示例
 
 ```
-  This Week (06-01 ~ 06-05)  Total: $228.42
+  This Week (06-02 ~ 06-08)  Total: $361.28
+
+  ── Claude Code ──
 
   Project                         Input       Output      Cache W     Cache R     Cost
   ──────────────────────────────────────────────────────────────────────────────────────────
-  Back-end/branch_payment_api     2.3M        465.2K      3.2M        92.0M       $172.95
-  Back-end/non-degree-server      567.8K      57.3K       518.1K      10.3M       $37.42
-  personal/cctok                  69.8K       63.1K       335.7K      11.0M       $18.05
+  Back-end/branch_payment_api     6.2M        505.8K      3.2M        95.1M       $173.81
+  Back-end/non-degree-server      584.5K      69.7K       558.8K      12.1M       $40.47
+  personal/cctok                  81.2K       85.6K       415.1K      18.0M       $27.36
   ──────────────────────────────────────────────────────────────────────────────────────────
-  Total                           2.9M        585.5K                              $228.42
+  Total                           6.9M        661.1K                              $241.64
+
+  ── Codex ──
+
+  Project                         Input       Output      Cache W     Cache R     Cost
+  ──────────────────────────────────────────────────────────────────────────────────────────
+  Back-end/non-degree-server      46.0M       474.2K      0           37.9M       $114.66
+  Back-end/branch_payment_api     1.8M        24.5K       0           1.5M        $4.62
+  ahead/cs_project                136.4K      3.7K        0           92.8K       $0.35
+  ──────────────────────────────────────────────────────────────────────────────────────────
+  Total                           47.9M       502.4K                              $119.64
 ```
 
 ## 配置
@@ -71,10 +88,12 @@ cctok config -i
 配置文件位于 `~/.cctok/config.toml`：
 
 ```toml
-# 全局倍率（如 Max plan 5x，默认 1.0）
+# 全局倍率（默认 1.0，费用 = token × 单价 × 倍率）
 multiplier = 1.0
 
-# 模型定价（$/1M tokens），支持前缀匹配
+# 模型定价（$/1M tokens），支持前缀匹配，大小写不敏感
+
+# --- Anthropic ---
 [pricing.claude-opus-4]
 input = 15.0
 output = 75.0
@@ -87,11 +106,18 @@ output = 15.0
 cache_write = 3.75
 cache_read = 0.30
 
-[pricing.claude-haiku-4]
-input = 0.80
-output = 4.0
-cache_write = 1.0
-cache_read = 0.08
+# --- OpenAI (Codex) ---
+[pricing.gpt-5.5]
+input = 2.0
+output = 8.0
+cache_write = 0
+cache_read = 0.50
+
+[pricing.gpt-5.4]
+input = 2.0
+output = 8.0
+cache_write = 0
+cache_read = 0.50
 ```
 
 支持精确模型名匹配（最长前缀优先），例如为 `claude-opus-4-8` 单独设定不同价格。
@@ -113,11 +139,11 @@ cache_read = 0.08
 
 ## 工作原理
 
-1. 扫描 `~/.claude/projects/` 下所有 `.jsonl` 文件（含子代理）
-2. 流式解析，只提取 `type: "assistant"` 且包含 `usage` 的记录
-3. 按 `message.id` 去重（保留 `output_tokens` 最大的记录）
+1. 扫描 `~/.claude/projects/` 和 `~/.codex/sessions/` 下所有 `.jsonl` 文件
+2. Claude Code：流式解析 `type: "assistant"` 记录，按 `message.id` 去重
+3. Codex：解析 `token_count` 事件，从 `turn_context` 获取模型名
 4. 按项目目录归属分组，从 `cwd` 字段提取可读的项目名
-5. 根据配置的模型定价和倍率计算费用
+5. 根据配置的模型定价和倍率计算费用，按来源分区展示
 
 ## 技术栈
 
