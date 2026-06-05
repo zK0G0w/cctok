@@ -11,11 +11,19 @@ Claude Code & Codex 本地 token 用量统计与费用计算 CLI 工具。
 
 ## 安装
 
+### Homebrew（推荐）
+
+```bash
+brew install zK0G0w/tap/cctok
+```
+
+### Go install
+
 ```bash
 go install github.com/zK0G0w/cctok@latest
 ```
 
-或克隆后本地编译：
+### 从源码编译
 
 ```bash
 git clone https://github.com/zK0G0w/cctok.git
