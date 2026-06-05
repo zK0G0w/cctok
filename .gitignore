@@ -1,0 +1,8 @@
+# 编译产物
+cctok
+
+# IDE
+.idea/
+
+# 规划文档
+ccusage-go-plan.md
