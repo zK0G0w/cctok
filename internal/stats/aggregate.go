@@ -2,6 +2,7 @@ package stats
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"cctok/internal/config"
@@ -62,6 +63,47 @@ func FilterByDay(records []parser.Record, day time.Time) []parser.Record {
 	return filtered
 }
 
+// FilterByWeek 过滤本周（周一至今天）的记录
+func FilterByWeek(records []parser.Record, now time.Time) []parser.Record {
+	loc := time.Now().Location()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	weekday := int(today.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+	monday := today.AddDate(0, 0, -(weekday - 1))
+	end := today.Add(24 * time.Hour)
+	return filterByRange(records, monday, end)
+}
+
+// FilterByMonth 过滤本月的记录
+func FilterByMonth(records []parser.Record, now time.Time) []parser.Record {
+	loc := time.Now().Location()
+	firstDay := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
+	end := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, loc)
+	return filterByRange(records, firstDay, end)
+}
+
+// FilterByRange 过滤指定日期范围 [from, to] 的记录（含两端）
+func FilterByRange(records []parser.Record, from, to time.Time) []parser.Record {
+	loc := time.Now().Location()
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
+	end := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, loc).Add(24 * time.Hour)
+	return filterByRange(records, start, end)
+}
+
+func filterByRange(records []parser.Record, start, end time.Time) []parser.Record {
+	loc := time.Now().Location()
+	var filtered []parser.Record
+	for _, r := range records {
+		local := r.Timestamp.In(loc)
+		if !local.Before(start) && local.Before(end) {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
+}
+
 // AggregateByProject 按项目聚合统计
 func AggregateByProject(records []parser.Record, cfg *config.Config) []GroupStats {
 	m := make(map[string]*GroupStats)
@@ -114,6 +156,71 @@ func AggregateByModel(records []parser.Record, cfg *config.Config) []GroupStats 
 		return result[i].TotalCost > result[j].TotalCost
 	})
 	return result
+}
+
+// SessionStats 会话级统计
+type SessionStats struct {
+	SessionID    string
+	Project      string
+	Model        string
+	InputTokens  int
+	OutputTokens int
+	CacheWrite   int
+	CacheRead    int
+	TotalCost    float64
+	RequestCount int
+	FirstTime    time.Time
+	LastTime     time.Time
+}
+
+// AggregateBySession 按会话聚合统计
+func AggregateBySession(records []parser.Record, cfg *config.Config) []SessionStats {
+	m := make(map[string]*SessionStats)
+	for _, r := range records {
+		ss, ok := m[r.SessionID]
+		if !ok {
+			ss = &SessionStats{
+				SessionID: r.SessionID,
+				Project:   r.Project,
+				Model:     r.Model,
+				FirstTime: r.Timestamp,
+				LastTime:  r.Timestamp,
+			}
+			m[r.SessionID] = ss
+		}
+		ss.InputTokens += r.Usage.InputTokens
+		ss.OutputTokens += r.Usage.OutputTokens
+		ss.CacheWrite += r.Usage.CacheCreationInputTokens
+		ss.CacheRead += r.Usage.CacheReadInputTokens
+		ss.TotalCost += cfg.CalculateCost(r.Model, r.Usage.InputTokens, r.Usage.OutputTokens, r.Usage.CacheCreationInputTokens, r.Usage.CacheReadInputTokens)
+		ss.RequestCount++
+		if r.Timestamp.Before(ss.FirstTime) {
+			ss.FirstTime = r.Timestamp
+		}
+		if r.Timestamp.After(ss.LastTime) {
+			ss.LastTime = r.Timestamp
+		}
+	}
+
+	result := make([]SessionStats, 0, len(m))
+	for _, ss := range m {
+		result = append(result, *ss)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].LastTime.After(result[j].LastTime)
+	})
+	return result
+}
+
+// FilterByProject 过滤指定项目名（模糊匹配）的记录
+func FilterByProject(records []parser.Record, project string) []parser.Record {
+	var filtered []parser.Record
+	for _, r := range records {
+		if strings.Contains(strings.ToLower(r.Project), strings.ToLower(project)) {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
 }
 
 // BuildSummary 构建汇总结果

@@ -3,6 +3,7 @@ package display
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"cctok/internal/stats"
 
@@ -145,4 +146,37 @@ func padRight(s string, width int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", width-visLen)
+}
+
+// RenderSessions 渲染按会话汇总的表格
+func RenderSessions(sessions []stats.SessionStats, label string) {
+	var totalCost float64
+	for _, s := range sessions {
+		totalCost += s.TotalCost
+	}
+
+	fmt.Printf("\n  %s  Sessions: %d  Total: %s\n\n",
+		headerStyle.Render(label),
+		len(sessions),
+		costStyle.Render(formatCost(totalCost)))
+
+	headers := []string{"Time", "Project", "Model", "Reqs", "Output", "Cost"}
+	widths := []int{16, 28, 22, 6, 10, 10}
+
+	printRow(headers, widths, headerStyle)
+	printSep(widths)
+
+	loc := time.Now().Location()
+	for _, s := range sessions {
+		row := []string{
+			s.LastTime.In(loc).Format("01-02 15:04"),
+			projectStyle.Render(truncate(s.Project, widths[1])),
+			truncate(s.Model, widths[2]),
+			fmt.Sprintf("%d", s.RequestCount),
+			formatTokens(s.OutputTokens),
+			costStyle.Render(formatCost(s.TotalCost)),
+		}
+		printRawRow(row, widths)
+	}
+	fmt.Println()
 }

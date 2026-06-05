@@ -16,7 +16,7 @@ var modelsCmd = &cobra.Command{
 	Use:   "models",
 	Short: "查看今日 token 用量（按模型）",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg := config.Default()
+		cfg := config.Load()
 		records, err := parser.ParseAll(cfg.ClaudeDir)
 		if err != nil {
 			return err
