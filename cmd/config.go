@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"cctok/internal/config"
 
@@ -45,7 +46,11 @@ func openEditor(path string) error {
 		editor = os.Getenv("VISUAL")
 	}
 	if editor == "" {
-		editor = "vi"
+		if runtime.GOOS == "windows" {
+			editor = "notepad"
+		} else {
+			editor = "vi"
+		}
 	}
 
 	c := exec.Command(editor, path)
