@@ -31,8 +31,8 @@ var weeklyCmd = &cobra.Command{
 		}
 
 		label := fmt.Sprintf("This Week (%s)", weekRange(time.Now()))
-		summary := stats.BuildSummary(records, cfg, label)
-		display.RenderToday(summary)
+		summaries := stats.BuildSourceSummaries(records, cfg, label)
+		display.RenderTodayBySource(summaries, label)
 		return nil
 	},
 }

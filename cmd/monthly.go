@@ -31,8 +31,8 @@ var monthlyCmd = &cobra.Command{
 		}
 
 		label := fmt.Sprintf("This Month (%s)", time.Now().Format("2006-01"))
-		summary := stats.BuildSummary(records, cfg, label)
-		display.RenderToday(summary)
+		summaries := stats.BuildSourceSummaries(records, cfg, label)
+		display.RenderTodayBySource(summaries, label)
 		return nil
 	},
 }

@@ -20,9 +20,30 @@ var (
 
 // RenderToday 渲染按项目汇总的表格
 func RenderToday(summary *stats.Summary) {
-	fmt.Printf("\n  %s  Total: %s\n\n",
-		headerStyle.Render(summary.TimeRange),
-		costStyle.Render(formatCost(summary.TotalCost)))
+	renderProjectTable("", summary)
+}
+
+// RenderTodayBySource 渲染按工具分区的项目汇总表格
+func RenderTodayBySource(summaries []stats.SourceSummary, timeRange string) {
+	var grandTotal float64
+	for _, s := range summaries {
+		grandTotal += s.Summary.TotalCost
+	}
+	fmt.Printf("\n  %s  Total: %s\n",
+		headerStyle.Render(timeRange),
+		costStyle.Render(formatCost(grandTotal)))
+
+	for _, s := range summaries {
+		renderProjectTable(s.Source, s.Summary)
+	}
+}
+
+func renderProjectTable(source string, summary *stats.Summary) {
+	if source != "" {
+		fmt.Printf("\n  %s\n\n", dimStyle.Render("── "+source+" ──"))
+	} else {
+		fmt.Printf("\n")
+	}
 
 	headers := []string{"Project", "Input", "Output", "Cache W", "Cache R", "Cost"}
 	widths := []int{30, 10, 10, 10, 10, 10}
@@ -52,14 +73,34 @@ func RenderToday(summary *stats.Summary) {
 		costStyle.Render(formatCost(summary.TotalCost)),
 	}
 	printRawRow(totalRow, widths)
-	fmt.Println()
 }
 
 // RenderModels 渲染按模型汇总的表格
 func RenderModels(summary *stats.Summary) {
-	fmt.Printf("\n  %s  Total: %s\n\n",
-		headerStyle.Render(summary.TimeRange),
-		costStyle.Render(formatCost(summary.TotalCost)))
+	renderModelTable("", summary)
+}
+
+// RenderModelsBySource 渲染按工具分区的模型汇总表格
+func RenderModelsBySource(summaries []stats.SourceSummary, timeRange string) {
+	var grandTotal float64
+	for _, s := range summaries {
+		grandTotal += s.Summary.TotalCost
+	}
+	fmt.Printf("\n  %s  Total: %s\n",
+		headerStyle.Render(timeRange),
+		costStyle.Render(formatCost(grandTotal)))
+
+	for _, s := range summaries {
+		renderModelTable(s.Source, s.Summary)
+	}
+}
+
+func renderModelTable(source string, summary *stats.Summary) {
+	if source != "" {
+		fmt.Printf("\n  %s\n\n", dimStyle.Render("── "+source+" ──"))
+	} else {
+		fmt.Printf("\n")
+	}
 
 	headers := []string{"Model", "Reqs", "Input", "Output", "Cache W", "Cache R", "Cost"}
 	widths := []int{24, 6, 10, 10, 10, 10, 10}
@@ -91,7 +132,6 @@ func RenderModels(summary *stats.Summary) {
 		costStyle.Render(formatCost(summary.TotalCost)),
 	}
 	printRawRow(totalRow, widths)
-	fmt.Println()
 }
 
 func formatTokens(n int) string {

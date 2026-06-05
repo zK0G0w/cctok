@@ -47,8 +47,8 @@ var rangeCmd = &cobra.Command{
 		}
 
 		label := fmt.Sprintf("%s ~ %s", rangeFrom, rangeTo)
-		summary := stats.BuildSummary(records, cfg, label)
-		display.RenderToday(summary)
+		summaries := stats.BuildSourceSummaries(records, cfg, label)
+		display.RenderTodayBySource(summaries, label)
 		return nil
 	},
 }
