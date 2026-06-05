@@ -24,6 +24,7 @@ type Record struct {
 	Model     string
 	Project   string
 	SessionID string
+	Source    string // "Claude Code" 或 "Codex"
 	Usage     Usage
 	Timestamp time.Time
 }
@@ -107,7 +108,7 @@ func ParseFile(path string, projectName string) ([]Record, error) {
 	return records, nil
 }
 
-// ParseAll 发现并解析所有 JSONL 文件
+// ParseAll 发现并解析所有 JSONL 文件（Claude Code + Codex）
 func ParseAll(claudeDir string) ([]Record, error) {
 	files, err := DiscoverFiles(claudeDir)
 	if err != nil {
@@ -115,29 +116,33 @@ func ParseAll(claudeDir string) ([]Record, error) {
 	}
 
 	projectsDir := filepath.Join(claudeDir, "projects")
-	// 第一遍：按项目目录分组，从每组第一条记录的 cwd 提取项目名
 	projectNameCache := make(map[string]string)
 
+	// 第一遍：收集每个项目目录的可读名称（从有 cwd 的文件中获取）
+	for _, f := range files {
+		dirName := extractProjectDir(f, projectsDir)
+		if _, ok := projectNameCache[dirName]; ok {
+			continue
+		}
+		_, firstCwd, _ := parseFileWithCwd(f)
+		if firstCwd != "" {
+			projectNameCache[dirName] = ExtractProjectName(firstCwd)
+		}
+	}
+
+	// 第二遍：解析所有文件并赋予项目名
 	var all []Record
 	for _, f := range files {
 		dirName := extractProjectDir(f, projectsDir)
-		projectName, cached := projectNameCache[dirName]
-		if !cached {
-			projectName = "" // 先留空，解析时从第一条 cwd 提取
+		projectName := projectNameCache[dirName]
+		if projectName == "" {
+			projectName = dirName
 		}
 
-		records, firstCwd, err := parseFileWithCwd(f)
+		records, _, err := parseFileWithCwd(f)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: 跳过文件 %s: %v\n", f, err)
 			continue
-		}
-
-		if !cached && firstCwd != "" {
-			projectName = ExtractProjectName(firstCwd)
-			projectNameCache[dirName] = projectName
-		} else if !cached {
-			projectName = dirName
-			projectNameCache[dirName] = projectName
 		}
 
 		for i := range records {
@@ -145,6 +150,15 @@ func ParseAll(claudeDir string) ([]Record, error) {
 		}
 		all = append(all, records...)
 	}
+
+	// 合并 Codex 数据
+	codexRecords, err := ParseAllCodex()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: 读取 Codex 数据失败: %v\n", err)
+	} else {
+		all = append(all, codexRecords...)
+	}
+
 	return all, nil
 }
 
@@ -204,6 +218,7 @@ func parseFileWithCwd(path string) ([]Record, string, error) {
 			Usage:     raw.Message.Usage,
 			Timestamp: ts,
 			SessionID: raw.SessionID,
+			Source:    "Claude Code",
 		})
 	}
 

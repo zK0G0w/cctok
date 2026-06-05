@@ -31,8 +31,8 @@ var modelsCmd = &cobra.Command{
 		}
 
 		label := fmt.Sprintf("Today (%s)", time.Now().Format("2006-01-02"))
-		summary := stats.BuildSummary(records, cfg, label)
-		display.RenderModels(summary)
+		summaries := stats.BuildSourceSummaries(records, cfg, label)
+		display.RenderModelsBySource(summaries, label)
 		return nil
 	},
 }

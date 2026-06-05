@@ -54,15 +54,25 @@ func defaultModels() []ModelPricing {
 		{Prefix: "claude-haiku-4", Price: TokenPrice{Input: 0.80, Output: 4.0, CacheWrite: 1.0, CacheRead: 0.08}},
 		{Prefix: "claude-sonnet-3", Price: TokenPrice{Input: 3.0, Output: 15.0, CacheWrite: 3.75, CacheRead: 0.30}},
 		{Prefix: "claude-haiku-3", Price: TokenPrice{Input: 0.25, Output: 1.25, CacheWrite: 0.30, CacheRead: 0.03}},
+		{Prefix: "gpt-5.5", Price: TokenPrice{Input: 2.0, Output: 8.0, CacheWrite: 0, CacheRead: 0.50}},
+		{Prefix: "gpt-5.4", Price: TokenPrice{Input: 2.0, Output: 8.0, CacheWrite: 0, CacheRead: 0.50}},
+		{Prefix: "gpt-5.3", Price: TokenPrice{Input: 2.0, Output: 8.0, CacheWrite: 0, CacheRead: 0.50}},
+		{Prefix: "gpt-5", Price: TokenPrice{Input: 2.0, Output: 8.0, CacheWrite: 0, CacheRead: 0.50}},
+		{Prefix: "gpt-4o", Price: TokenPrice{Input: 2.50, Output: 10.0, CacheWrite: 0, CacheRead: 1.25}},
+		{Prefix: "gpt-4.1", Price: TokenPrice{Input: 2.0, Output: 8.0, CacheWrite: 0, CacheRead: 0.50}},
+		{Prefix: "o3", Price: TokenPrice{Input: 2.0, Output: 8.0, CacheWrite: 0, CacheRead: 0.50}},
+		{Prefix: "o4-mini", Price: TokenPrice{Input: 1.10, Output: 4.40, CacheWrite: 0, CacheRead: 0.275}},
 	}
 }
 
-// FindPricing 根据模型名前缀匹配定价，优先匹配最长前缀（最精确），未匹配返回零值
+// FindPricing 根据模型名前缀匹配定价，优先匹配最长前缀（最精确），大小写不敏感，未匹配返回零值
 func (c *Config) FindPricing(model string) TokenPrice {
+	lowerModel := strings.ToLower(model)
 	bestIdx := -1
 	bestLen := 0
 	for i, m := range c.Models {
-		if strings.HasPrefix(model, m.Prefix) && len(m.Prefix) > bestLen {
+		lowerPrefix := strings.ToLower(m.Prefix)
+		if strings.HasPrefix(lowerModel, lowerPrefix) && len(m.Prefix) > bestLen {
 			bestIdx = i
 			bestLen = len(m.Prefix)
 		}
@@ -116,11 +126,20 @@ func Load() *Config {
 		cfg.Multiplier = tc.Multiplier
 	}
 	if len(tc.Pricing) > 0 {
-		models := make([]ModelPricing, 0, len(tc.Pricing))
+		// 合并覆盖：配置文件中的定价覆盖同前缀的默认值，新增的追加
+		overrides := make(map[string]TokenPrice, len(tc.Pricing))
 		for prefix, price := range tc.Pricing {
-			models = append(models, ModelPricing{Prefix: prefix, Price: price})
+			overrides[prefix] = price
 		}
-		cfg.Models = models
+		for i, m := range cfg.Models {
+			if price, ok := overrides[m.Prefix]; ok {
+				cfg.Models[i].Price = price
+				delete(overrides, m.Prefix)
+			}
+		}
+		for prefix, price := range overrides {
+			cfg.Models = append(cfg.Models, ModelPricing{Prefix: prefix, Price: price})
+		}
 	}
 
 	return cfg
@@ -132,11 +151,14 @@ func GenerateDefault() string {
 # Claude Code 数据目录（默认 ~/.claude）
 data_dir = "~/.claude"
 
-# 全局倍率（如 Max plan 5x，默认 1.0 为原始 API 定价）
+# 全局倍率（默认 1.0，费用 = token × 单价 × 倍率）
 multiplier = 1.0
 
 # 模型定价（单位：$/1M tokens）
 # 前缀匹配：claude-opus-4 会匹配 claude-opus-4-6、claude-opus-4-7 等
+# 大小写不敏感
+
+# --- Anthropic ---
 [pricing.claude-opus-4]
 input = 15.0
 output = 75.0
@@ -166,5 +188,48 @@ input = 0.25
 output = 1.25
 cache_write = 0.30
 cache_read = 0.03
+
+# --- OpenAI (Codex) ---
+[pricing.gpt-5.5]
+input = 2.0
+output = 8.0
+cache_write = 0
+cache_read = 0.50
+
+[pricing.gpt-5.4]
+input = 2.0
+output = 8.0
+cache_write = 0
+cache_read = 0.50
+
+[pricing.gpt-5.3]
+input = 2.0
+output = 8.0
+cache_write = 0
+cache_read = 0.50
+
+[pricing.gpt-4o]
+input = 2.50
+output = 10.0
+cache_write = 0
+cache_read = 1.25
+
+[pricing.gpt-4.1]
+input = 2.0
+output = 8.0
+cache_write = 0
+cache_read = 0.50
+
+[pricing.o3]
+input = 2.0
+output = 8.0
+cache_write = 0
+cache_read = 0.50
+
+[pricing.o4-mini]
+input = 1.10
+output = 4.40
+cache_write = 0
+cache_read = 0.275
 `
 }

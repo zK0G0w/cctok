@@ -30,6 +30,50 @@ type Summary struct {
 	TimeRange   string
 }
 
+// SourceSummary 按工具来源分组的汇总
+type SourceSummary struct {
+	Source  string
+	Summary *Summary
+}
+
+// SplitBySource 按 Source 字段分组记录
+func SplitBySource(records []parser.Record) map[string][]parser.Record {
+	m := make(map[string][]parser.Record)
+	for _, r := range records {
+		source := r.Source
+		if source == "" {
+			source = "Claude Code"
+		}
+		m[source] = append(m[source], r)
+	}
+	return m
+}
+
+// BuildSourceSummaries 构建按工具分组的汇总列表
+func BuildSourceSummaries(records []parser.Record, cfg *config.Config, label string) []SourceSummary {
+	groups := SplitBySource(records)
+	// 固定顺序：Claude Code 在前，Codex 在后
+	order := []string{"Claude Code", "Codex"}
+	var result []SourceSummary
+	for _, source := range order {
+		recs, ok := groups[source]
+		if !ok || len(recs) == 0 {
+			continue
+		}
+		summary := BuildSummary(recs, cfg, label)
+		result = append(result, SourceSummary{Source: source, Summary: summary})
+	}
+	// 处理其他可能的来源
+	for source, recs := range groups {
+		if source == "Claude Code" || source == "Codex" {
+			continue
+		}
+		summary := BuildSummary(recs, cfg, label)
+		result = append(result, SourceSummary{Source: source, Summary: summary})
+	}
+	return result
+}
+
 // Dedup 按 message.id 去重，保留 output_tokens 最大的记录
 func Dedup(records []parser.Record) []parser.Record {
 	seen := make(map[string]int)

@@ -28,7 +28,7 @@ func runInteractiveConfig(path string) error {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("全局倍率 (multiplier)").
-				Description("如 Max plan 填 5.0，原始 API 价格填 1.0").
+				Description("默认 1.0，费用 = token × 单价 × 倍率").
 				Value(&multiplierStr),
 			huh.NewSelect[string]().
 				Title("选择要编辑的模型定价").
