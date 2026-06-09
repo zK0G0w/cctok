@@ -3,6 +3,8 @@ project_name: cctok
 builds:
   - main: .
     binary: cctok
+    ldflags:
+      - -s -w -X cctok/cmd.version={{.Version}}
     goos:
       - darwin
       - linux

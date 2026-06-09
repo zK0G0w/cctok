@@ -13,9 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "cctok",
-	Short: "Claude Code & Codex token 用量统计工具",
+	Version: version,
+	Use:     "cctok",
+	Short:   "Claude Code & Codex token 用量统计工具",
 	Long: `cctok - Claude Code & Codex token 用量与费用统计
 
 读取本地 JSONL 会话文件，统计 token 用量并计算费用。
