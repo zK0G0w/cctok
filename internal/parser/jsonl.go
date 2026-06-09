@@ -43,6 +43,9 @@ type rawMessage struct {
 	Usage Usage  `json:"usage"`
 }
 
+// modelSynthetic 是 Claude Code 内部生成的占位记录，usage 全为 0，需过滤
+const modelSynthetic = "<synthetic>"
+
 // DiscoverFiles 遍历 Claude projects 目录，返回所有 .jsonl 文件路径
 func DiscoverFiles(claudeDir string) ([]string, error) {
 	projectsDir := filepath.Join(claudeDir, "projects")
@@ -63,51 +66,6 @@ func DiscoverFiles(claudeDir string) ([]string, error) {
 	return files, err
 }
 
-// ParseFile 解析单个 JSONL 文件，返回 assistant 类型的 Record 列表
-func ParseFile(path string, projectName string) ([]Record, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	var records []Record
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-
-		var raw rawRecord
-		if err := json.Unmarshal(line, &raw); err != nil {
-			continue
-		}
-
-		if raw.Type != "assistant" || raw.Message.ID == "" {
-			continue
-		}
-
-		ts, err := time.Parse(time.RFC3339Nano, raw.Timestamp)
-		if err != nil {
-			ts = time.Time{}
-		}
-
-		records = append(records, Record{
-			MessageID: raw.Message.ID,
-			Model:     raw.Message.Model,
-			Usage:     raw.Message.Usage,
-			Timestamp: ts,
-			SessionID: raw.SessionID,
-			Project:   projectName,
-		})
-	}
-
-	return records, nil
-}
-
 // ParseAll 发现并解析所有 JSONL 文件（Claude Code + Codex）
 func ParseAll(claudeDir string) ([]Record, error) {
 	files, err := DiscoverFiles(claudeDir)
@@ -118,37 +76,43 @@ func ParseAll(claudeDir string) ([]Record, error) {
 	projectsDir := filepath.Join(claudeDir, "projects")
 	projectNameCache := make(map[string]string)
 
-	// 第一遍：收集每个项目目录的可读名称（从有 cwd 的文件中获取）
+	type fileResult struct {
+		records []Record
+		cwd     string
+	}
+	resultCache := make(map[string]fileResult)
+
+	// 单次遍历：解析文件并收集项目名（同一项目目录下取第一个有效 cwd 作为项目名来源）
 	for _, f := range files {
-		dirName := extractProjectDir(f, projectsDir)
-		if _, ok := projectNameCache[dirName]; ok {
+		records, cwd, err := parseFileWithCwd(f)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: 跳过文件 %s: %v\n", f, err)
 			continue
 		}
-		_, firstCwd, _ := parseFileWithCwd(f)
-		if firstCwd != "" {
-			projectNameCache[dirName] = ExtractProjectName(firstCwd)
+		resultCache[f] = fileResult{records: records, cwd: cwd}
+
+		dirName := extractProjectDir(f, projectsDir)
+		if _, ok := projectNameCache[dirName]; !ok && cwd != "" {
+			projectNameCache[dirName] = ExtractProjectName(cwd)
 		}
 	}
 
-	// 第二遍：解析所有文件并赋予项目名
+	// 利用缓存结果分配项目名（子代理文件可能无 cwd，回退到目录名）
 	var all []Record
 	for _, f := range files {
+		res, ok := resultCache[f]
+		if !ok {
+			continue
+		}
 		dirName := extractProjectDir(f, projectsDir)
 		projectName := projectNameCache[dirName]
 		if projectName == "" {
 			projectName = dirName
 		}
-
-		records, _, err := parseFileWithCwd(f)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: 跳过文件 %s: %v\n", f, err)
-			continue
+		for i := range res.records {
+			res.records[i].Project = projectName
 		}
-
-		for i := range records {
-			records[i].Project = projectName
-		}
-		all = append(all, records...)
+		all = append(all, res.records...)
 	}
 
 	// 合并 Codex 数据
@@ -186,6 +150,7 @@ func parseFileWithCwd(path string) ([]Record, string, error) {
 	var records []Record
 	var firstCwd string
 	scanner := bufio.NewScanner(f)
+	// 部分行包含完整 message content，需要较大 buffer
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
 	for scanner.Scan() {
@@ -200,6 +165,10 @@ func parseFileWithCwd(path string) ([]Record, string, error) {
 		}
 
 		if raw.Type != "assistant" || raw.Message.ID == "" {
+			continue
+		}
+
+		if raw.Message.Model == modelSynthetic {
 			continue
 		}
 
@@ -225,7 +194,8 @@ func parseFileWithCwd(path string) ([]Record, string, error) {
 	return records, firstCwd, nil
 }
 
-// ExtractProjectName 从 cwd 路径中提取最后两段作为项目名（保留兼容）
+// ExtractProjectName 从 cwd 路径中提取最后两段作为项目名
+// 例：/Users/dev/workspace/backend/payment → "backend/payment"
 func ExtractProjectName(cwd string) string {
 	if cwd == "" {
 		return "unknown"

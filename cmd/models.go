@@ -12,10 +12,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var modelsPeriod string
+
 var modelsCmd = &cobra.Command{
 	Use:   "models",
-	Short: "查看今日 token 用量（按模型）",
-	Long:  "展示今天所有 Claude Code 会话的 token 消耗和费用，按模型分组汇总。",
+	Short: "查看 token 用量（按模型）",
+	Long:  "按模型分组展示 token 消耗和费用，支持 --period 指定时间范围。",
+	Example: `  cctok models
+  cctok models --period weekly
+  cctok models --period monthly`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := config.Load()
 		records, err := parser.ParseAll(cfg.ClaudeDir)
@@ -23,14 +28,13 @@ var modelsCmd = &cobra.Command{
 			return err
 		}
 		records = stats.Dedup(records)
-		records = stats.FilterByDay(records, time.Now())
+		records, label := filterByPeriod(records, modelsPeriod, time.Now())
 
 		if len(records) == 0 {
-			fmt.Println("今日暂无用量数据。")
+			fmt.Println("暂无用量数据。")
 			return nil
 		}
 
-		label := fmt.Sprintf("Today (%s)", time.Now().Format("2006-01-02"))
 		summaries := stats.BuildSourceSummaries(records, cfg, label)
 		display.RenderModelsBySource(summaries, label)
 		return nil
@@ -38,5 +42,6 @@ var modelsCmd = &cobra.Command{
 }
 
 func init() {
+	modelsCmd.Flags().StringVarP(&modelsPeriod, "period", "p", "today", "时间范围: today, weekly, monthly")
 	rootCmd.AddCommand(modelsCmd)
 }

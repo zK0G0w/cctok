@@ -75,6 +75,7 @@ func BuildSourceSummaries(records []parser.Record, cfg *config.Config, label str
 }
 
 // Dedup 按 message.id 去重，保留 output_tokens 最大的记录
+// JSONL 流式写入可能导致同一消息出现多次（每次追加 token），取最终状态
 func Dedup(records []parser.Record) []parser.Record {
 	seen := make(map[string]int)
 	result := make([]parser.Record, 0, len(records))

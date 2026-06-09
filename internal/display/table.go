@@ -23,8 +23,7 @@ func RenderToday(summary *stats.Summary) {
 	renderProjectTable("", summary)
 }
 
-// RenderTodayBySource 渲染按工具分区的项目汇总表格
-func RenderTodayBySource(summaries []stats.SourceSummary, timeRange string) {
+func renderSourceHeader(summaries []stats.SourceSummary, timeRange string) {
 	var grandTotal float64
 	for _, s := range summaries {
 		grandTotal += s.Summary.TotalCost
@@ -32,7 +31,11 @@ func RenderTodayBySource(summaries []stats.SourceSummary, timeRange string) {
 	fmt.Printf("\n  %s  Total: %s\n",
 		headerStyle.Render(timeRange),
 		costStyle.Render(formatCost(grandTotal)))
+}
 
+// RenderTodayBySource 渲染按工具分区的项目汇总表格
+func RenderTodayBySource(summaries []stats.SourceSummary, timeRange string) {
+	renderSourceHeader(summaries, timeRange)
 	for _, s := range summaries {
 		renderProjectTable(s.Source, s.Summary)
 	}
@@ -82,14 +85,7 @@ func RenderModels(summary *stats.Summary) {
 
 // RenderModelsBySource 渲染按工具分区的模型汇总表格
 func RenderModelsBySource(summaries []stats.SourceSummary, timeRange string) {
-	var grandTotal float64
-	for _, s := range summaries {
-		grandTotal += s.Summary.TotalCost
-	}
-	fmt.Printf("\n  %s  Total: %s\n",
-		headerStyle.Render(timeRange),
-		costStyle.Render(formatCost(grandTotal)))
-
+	renderSourceHeader(summaries, timeRange)
 	for _, s := range summaries {
 		renderModelTable(s.Source, s.Summary)
 	}
@@ -135,6 +131,9 @@ func renderModelTable(source string, summary *stats.Summary) {
 }
 
 func formatTokens(n int) string {
+	if n == 0 {
+		return dimStyle.Render("-")
+	}
 	switch {
 	case n >= 1_000_000:
 		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
@@ -150,10 +149,18 @@ func formatCost(c float64) string {
 }
 
 func truncate(s string, maxWidth int) string {
-	if len(s) <= maxWidth {
+	if lipgloss.Width(s) <= maxWidth {
 		return s
 	}
-	return s[:maxWidth-1] + "…"
+	// 逐 rune 截断，按显示宽度判断
+	result := []rune(s)
+	for i := len(result); i > 0; i-- {
+		candidate := string(result[:i]) + "…"
+		if lipgloss.Width(candidate) <= maxWidth {
+			return candidate
+		}
+	}
+	return "…"
 }
 
 func printRow(cols []string, widths []int, style lipgloss.Style) {

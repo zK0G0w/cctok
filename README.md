@@ -136,7 +136,7 @@ cache_read = 0.50
 |------|------|
 | `cctok` | 查看今日用量（默认） |
 | `cctok today` | 查看今日用量（按项目） |
-| `cctok models` | 查看今日用量（按模型） |
+| `cctok models` | 查看 token 用量（按模型，支持 `-p weekly/monthly`） |
 | `cctok weekly` | 查看本周用量 |
 | `cctok monthly` | 查看本月用量 |
 | `cctok range` | 查看指定日期范围（`--from` / `--to`） |

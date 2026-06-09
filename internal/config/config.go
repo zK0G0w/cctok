@@ -65,7 +65,8 @@ func defaultModels() []ModelPricing {
 	}
 }
 
-// FindPricing 根据模型名前缀匹配定价，优先匹配最长前缀（最精确），大小写不敏感，未匹配返回零值
+// FindPricing 根据模型名查找定价
+// 匹配规则：大小写不敏感的前缀匹配，最长前缀优先（精确匹配 > 粗粒度前缀）
 func (c *Config) FindPricing(model string) TokenPrice {
 	lowerModel := strings.ToLower(model)
 	bestIdx := -1
@@ -126,7 +127,7 @@ func Load() *Config {
 		cfg.Multiplier = tc.Multiplier
 	}
 	if len(tc.Pricing) > 0 {
-		// 合并覆盖：配置文件中的定价覆盖同前缀的默认值，新增的追加
+		// 合并策略：配置文件覆盖同前缀的默认值，新前缀追加（不会清空默认定价）
 		overrides := make(map[string]TokenPrice, len(tc.Pricing))
 		for prefix, price := range tc.Pricing {
 			overrides[prefix] = price

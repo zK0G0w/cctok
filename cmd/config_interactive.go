@@ -136,19 +136,19 @@ func addNewModel(cfg *config.Config) error {
 func parsePrice(inputStr, outputStr, cacheWriteStr, cacheReadStr string) (config.TokenPrice, error) {
 	input, err := strconv.ParseFloat(inputStr, 64)
 	if err != nil {
-		return config.TokenPrice{}, fmt.Errorf("无效的 Input 价格: %s", inputStr)
+		return config.TokenPrice{}, fmt.Errorf("无效的 Input 价格 %q: %w", inputStr, err)
 	}
 	output, err := strconv.ParseFloat(outputStr, 64)
 	if err != nil {
-		return config.TokenPrice{}, fmt.Errorf("无效的 Output 价格: %s", outputStr)
+		return config.TokenPrice{}, fmt.Errorf("无效的 Output 价格 %q: %w", outputStr, err)
 	}
 	cacheWrite, err := strconv.ParseFloat(cacheWriteStr, 64)
 	if err != nil {
-		return config.TokenPrice{}, fmt.Errorf("无效的 Cache Write 价格: %s", cacheWriteStr)
+		return config.TokenPrice{}, fmt.Errorf("无效的 Cache Write 价格 %q: %w", cacheWriteStr, err)
 	}
 	cacheRead, err := strconv.ParseFloat(cacheReadStr, 64)
 	if err != nil {
-		return config.TokenPrice{}, fmt.Errorf("无效的 Cache Read 价格: %s", cacheReadStr)
+		return config.TokenPrice{}, fmt.Errorf("无效的 Cache Read 价格 %q: %w", cacheReadStr, err)
 	}
 	return config.TokenPrice{Input: input, Output: output, CacheWrite: cacheWrite, CacheRead: cacheRead}, nil
 }
@@ -161,7 +161,7 @@ func saveConfig(cfg *config.Config, path string) error {
 
 	content := fmt.Sprintf("# cctok 配置文件\ndata_dir = %q\nmultiplier = %.1f\n\n", "~/.claude", cfg.Multiplier)
 	for _, m := range cfg.Models {
-		content += fmt.Sprintf("[pricing.%q]\ninput = %.2f\noutput = %.2f\ncache_write = %.4f\ncache_read = %.4f\n\n",
+		content += fmt.Sprintf("[pricing.%s]\ninput = %.2f\noutput = %.2f\ncache_write = %.4f\ncache_read = %.4f\n\n",
 			m.Prefix, m.Price.Input, m.Price.Output, m.Price.CacheWrite, m.Price.CacheRead)
 	}
 
